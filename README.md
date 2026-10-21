@@ -16,6 +16,8 @@ Sistema móvil nativo para Android orientada a la gestión, registro de jornadas
 
 ---
 
+Tablero Trello: [https://trello.com/b/LcYhxT8D/electromechanics-app](https://trello.com/b/LcYhxT8D/electromechanics-app "https://trello.com/b/LcYhxT8D/electromechanics-app")
+
 ## 📁 Estructura Completa del Proyecto (`com.electromechanics.app`)
 
 ```text
@@ -54,5 +56,3 @@ com.electromechanics.app/
 │       └── AuthViewModel.kt         # Lógica de autenticación, validación de RUT único y excepciones
 └── utils/                           # Utilidades y Herramientas Auxiliares
     └── RutUtils.kt                  # Algoritmo de validación de dígito verificador y formato de RUT chileno
-
-Tablero Trello: [https://trello.com/b/LcYhxT8D/electromechanics-app](https://trello.com/b/LcYhxT8D/electromechanics-app "https://trello.com/b/LcYhxT8D/electromechanics-app")
