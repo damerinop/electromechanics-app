@@ -1,7 +1,5 @@
 package com.electromechanics.app.ui.screen
 
-import android.content.Context
-import android.os.Vibrator
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -9,12 +7,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -25,26 +23,20 @@ import androidx.compose.ui.unit.sp
 import com.electromechanics.app.R
 import com.electromechanics.app.ui.components.Footer
 import com.electromechanics.app.ui.components.Header
+import com.electromechanics.app.ui.components.camposColors
 import com.electromechanics.app.ui.theme.*
 import com.electromechanics.app.ui.viewmodel.AuthViewModel
 
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
-    onNavigateToRegister: () -> Unit,
     onLoginSuccess: () -> Unit
 ) {
-    val state = viewModel.uiState
     val context = LocalContext.current
-
-    val textFieldColors = OutlinedTextFieldDefaults.colors(
-        focusedTextColor = IndustrialTextWhite,
-        unfocusedTextColor = IndustrialTextWhite,
-        focusedBorderColor = IndustrialYellowAccent,
-        unfocusedBorderColor = Color.Gray,
-        focusedLabelColor = IndustrialYellowAccent,
-        unfocusedLabelColor = Color.Gray
-    )
+    val error by viewModel.error.observeAsState()
+    val cargando by viewModel.cargando.observeAsState(false)
+    var credencial by remember { mutableStateOf("") }
+    var clave by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = { Header(title = "INICIAR SESIÓN", userName = "Sin Sesión") },
@@ -59,7 +51,6 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Logotipo institucional
             Image(
                 painter = painterResource(id = R.drawable.logo_electromechanics),
                 contentDescription = "Logo Electromechanics",
@@ -87,42 +78,40 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
-                value = state.rut,
-                onValueChange = { viewModel.onRutChanged(it) },
+                value = credencial,
+                onValueChange = { credencial = it },
                 label = { Text("RUT / Correo Corporativo") },
-                colors = textFieldColors,
+                colors = camposColors(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedTextField(
-                value = state.clave,
-                onValueChange = { viewModel.onClaveChanged(it) },
+                value = clave,
+                onValueChange = { clave = it },
                 label = { Text("Contraseña") },
                 visualTransformation = PasswordVisualTransformation(),
-                colors = textFieldColors,
+                colors = camposColors(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
-            if (state.error != null) {
+            error?.let {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = state.error, color = IndustrialErrorRed)
+                Text(text = it, color = IndustrialErrorRed)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = {
-                    viewModel.login(context) {
-                        // Vibración suave al ingresar
-                        val v = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                        v.vibrate(300)
-                        Toast.makeText(context, "Bienvenido de nuevo", Toast.LENGTH_SHORT).show()
+                    viewModel.login(credencial, clave) {
+                        Toast.makeText(context, "Bienvenido", Toast.LENGTH_SHORT).show()
                         onLoginSuccess()
                     }
                 },
+                enabled = !cargando,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -132,23 +121,7 @@ fun LoginScreen(
                     contentColor = IndustrialBlack
                 )
             ) {
-                Text("INGRESAR", fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Button(
-                onClick = onNavigateToRegister,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = IndustrialBluePrimary,
-                    contentColor = IndustrialTextWhite
-                )
-            ) {
-                Text("REGISTRAR NUEVO OPERARIO")
+                Text(if (cargando) "CONECTANDO..." else "INGRESAR", fontWeight = FontWeight.Bold)
             }
         }
     }

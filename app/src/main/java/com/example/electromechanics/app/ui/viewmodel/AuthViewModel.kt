@@ -1,113 +1,101 @@
 package com.electromechanics.app.ui.viewmodel
 
-import android.content.Context
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.electromechanics.app.data.api.RetrofitElectromechanics
 import com.electromechanics.app.data.database.AppDatabase
-import com.electromechanics.app.data.local.entity.EmpleadoEntity
+import com.electromechanics.app.data.local.entity.toEntity
+import com.electromechanics.app.model.Empleado
 import com.electromechanics.app.utils.RutUtils
-import kotlinx.coroutines.Dispatchers
+import com.electromechanics.app.utils.Seguridad
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.io.IOException
 
-data class AuthUiState(
-    val rut: String = "",
-    val nombre: String = "",
-    val correo: String = "",
-    val especialidad: String = "",
-    val clave: String = "",
-    val confirmarClave: String = "",
-    val error: String? = null,
-    val usuarioLogueado: EmpleadoEntity? = null
-)
+class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
-class AuthViewModel : ViewModel() {
-    var uiState by mutableStateOf(AuthUiState())
-        private set
+    private val empleadoDao = AppDatabase.getDatabase(application).empleadoDao()
 
-    fun onRutChanged(v: String) { uiState = uiState.copy(rut = v, error = null) }
-    fun onNombreChanged(v: String) { uiState = uiState.copy(nombre = v, error = null) }
-    fun onCorreoChanged(v: String) { uiState = uiState.copy(correo = v, error = null) }
-    fun onEspecialidadChanged(v: String) { uiState = uiState.copy(especialidad = v, error = null) }
-    fun onClaveChanged(v: String) { uiState = uiState.copy(clave = v, error = null) }
-    fun onConfirmarClaveChanged(v: String) { uiState = uiState.copy(confirmarClave = v, error = null) }
+    private val _usuario = MutableLiveData<Empleado?>(null)
+    val usuario: LiveData<Empleado?> = _usuario
 
-    fun login(context: Context, onSuccess: () -> Unit) {
-        if (!RutUtils.esValido(uiState.rut)) {
-            uiState = uiState.copy(error = "RUT / Correo inválido")
+    private val _error = MutableLiveData<String?>(null)
+    val error: LiveData<String?> = _error
+
+    private val _cargando = MutableLiveData(false)
+    val cargando: LiveData<Boolean> = _cargando
+
+    private val _sesionCargada = MutableLiveData(false)
+    val sesionCargada: LiveData<Boolean> = _sesionCargada
+
+    init {
+        viewModelScope.launch {
+            try {
+                _usuario.value = empleadoDao.obtenerSesion()?.toEmpleado()
+            } catch (e: Exception) {
+                _usuario.value = null
+            }
+            _sesionCargada.value = true
+        }
+    }
+
+    fun login(credencial: String, clave: String, onExito: () -> Unit) {
+        if (credencial.isBlank() || clave.isBlank()) {
+            _error.value = "Ingrese RUT/correo y contraseña"
             return
         }
-        if (uiState.clave.isBlank()) {
-            uiState = uiState.copy(error = "Ingrese su contraseña")
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val db = AppDatabase.getDatabase(context)
-            val emp = db.empleadoDao().autenticar(uiState.rut, uiState.clave)
-            withContext(Dispatchers.Main) {
-                if (emp != null) {
-                    uiState = uiState.copy(usuarioLogueado = emp, error = null)
-                    onSuccess()
-                } else {
-                    // Usuario demo si no se ha registrado aún
-                    val demoUser = EmpleadoEntity(uiState.rut, uiState.rut, "Operario Terreno", "demo@electromechanics.cl", "Mantenimiento", uiState.clave)
-                    uiState = uiState.copy(usuarioLogueado = demoUser, error = null)
-                    onSuccess()
+        viewModelScope.launch {
+            _cargando.value = true
+            _error.value = null
+            val rutIngresado = RutUtils.limpiar(credencial)
+            val correoIngresado = credencial.trim().lowercase()
+            try {
+                val emp = RetrofitElectromechanics.empleados.listar().firstOrNull {
+                    (RutUtils.limpiar(it.rutTrabajador) == rutIngresado ||
+                        it.correoCorporativo.lowercase() == correoIngresado) &&
+                        it.contrasena == clave
                 }
+                if (emp == null) {
+                    _error.value = "Credenciales incorrectas"
+                } else if (!emp.esSupervisor && !emp.esTecnico) {
+                    _error.value = "Rol no habilitado en la app"
+                } else {
+                    val hash = Seguridad.hash(clave, RutUtils.limpiar(emp.rutTrabajador))
+                    empleadoDao.cerrarSesiones()
+                    empleadoDao.guardar(emp.toEntity(hash))
+                    _usuario.value = emp.copy(contrasena = "")
+                    onExito()
+                }
+            } catch (e: IOException) {
+                val local = empleadoDao.obtenerTodos().firstOrNull {
+                    (RutUtils.limpiar(it.rut) == rutIngresado || it.correo.lowercase() == correoIngresado) &&
+                        it.claveHash == Seguridad.hash(clave, RutUtils.limpiar(it.rut))
+                }
+                if (local == null) {
+                    _error.value = "Sin conexión y sin credenciales guardadas para este usuario"
+                } else {
+                    empleadoDao.cerrarSesiones()
+                    empleadoDao.guardar(local.copy(sesionActiva = true))
+                    _usuario.value = local.toEmpleado()
+                    onExito()
+                }
+            } catch (e: Exception) {
+                _error.value = "Error al iniciar sesión: ${e.message}"
+            } finally {
+                _cargando.value = false
             }
         }
     }
 
-    fun registrar(context: Context, onSuccess: () -> Unit) {
-        if (!RutUtils.esValido(uiState.rut)) {
-            uiState = uiState.copy(error = "RUT no válido")
-            return
-        }
-        if (uiState.nombre.isBlank() || uiState.clave.isBlank()) {
-            uiState = uiState.copy(error = "Complete los campos obligatorios")
-            return
-        }
-        if (uiState.clave != uiState.confirmarClave) {
-            uiState = uiState.copy(error = "Las contraseñas no coinciden")
-            return
-        }
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val db = AppDatabase.getDatabase(context)
-
-            // 1. Verificamos si ya existe un empleado registrado con este RUT
-            val empleadoExistente = db.empleadoDao().obtenerPorRut(uiState.rut)
-
-            if (empleadoExistente != null) {
-                withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(error = "El usuario con este RUT ya existe.")
-                }
-                return@launch
-            }
-
-            // 2. Si no existe, creamos e insertamos el registro
-            val nuevo = EmpleadoEntity(
-                id = uiState.rut,
-                rut = uiState.rut,
-                nombreCompleto = uiState.nombre,
-                correo = uiState.correo,
-                especialidad = uiState.especialidad,
-                clave = uiState.clave
-            )
-
+    fun logout() {
+        _usuario.value = null
+        _error.value = null
+        viewModelScope.launch {
             try {
-                db.empleadoDao().registrarEmpleado(nuevo)
-                withContext(Dispatchers.Main) {
-                    onSuccess()
-                }
+                empleadoDao.cerrarSesiones()
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(error = "Error al guardar el usuario.")
-                }
             }
         }
     }

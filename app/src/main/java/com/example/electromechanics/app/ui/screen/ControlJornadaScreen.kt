@@ -7,7 +7,6 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -15,6 +14,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -22,66 +22,82 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.electromechanics.app.data.database.AppDatabase
-import com.electromechanics.app.data.local.entity.RegistroJornadaEntity
+import com.electromechanics.app.model.Empleado
 import com.electromechanics.app.ui.components.Footer
 import com.electromechanics.app.ui.components.Header
 import com.electromechanics.app.ui.theme.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.*
+import com.electromechanics.app.ui.viewmodel.OperacionesViewModel
+import com.electromechanics.app.utils.fechaCorta
 
 @Composable
-fun ControlJornadaScreen(userName: String, userId: String = "default_user", onNavigateHome: () -> Unit, onLogout: () -> Unit) {
+fun ControlJornadaScreen(
+    usuario: Empleado,
+    vm: OperacionesViewModel,
+    onNavigateHome: () -> Unit,
+    onLogout: () -> Unit
+) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    var estadoJornada by remember { mutableStateOf("Fuera de Turno") }
-    var latActual by remember { mutableStateOf(-33.4489) }
-    var lngActual by remember { mutableStateOf(-70.6693) }
-    var infoGPS by remember { mutableStateOf("Buscando señal GPS...") }
+    val miId = usuario.idEmpleado.orEmpty()
+    val jornadas by vm.jornadas.observeAsState(emptyList())
+
+    var lat by remember { mutableStateOf<Double?>(null) }
+    var lng by remember { mutableStateOf<Double?>(null) }
 
     val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
-    val locationListener = object : LocationListener {
-        override fun onLocationChanged(location: Location) {
-            latActual = location.latitude
-            lngActual = location.longitude
-            infoGPS = "Lat: %.4f, Lng: %.4f".format(latActual, lngActual)
+    val locationListener = remember {
+        object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                lat = location.latitude
+                lng = location.longitude
+            }
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
         }
-        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-        override fun onProviderEnabled(provider: String) {}
-        override fun onProviderDisabled(provider: String) {}
+    }
+
+    fun iniciarGps() {
+        try {
+            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 0f, locationListener)
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
+                lat = it.latitude
+                lng = it.longitude
+            }
+        } catch (e: SecurityException) {
+        } catch (e: IllegalArgumentException) {
+        }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            try {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, locationListener)
-            } catch (e: SecurityException) { }
-        }
-    }
+    ) { isGranted -> if (isGranted) iniciarGps() }
 
     LaunchedEffect(Unit) {
+        vm.cargarJornadas()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            try {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0L, 0f, locationListener)
-                val lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                if (lastLoc != null) {
-                    latActual = lastLoc.latitude
-                    lngActual = lastLoc.longitude
-                    infoGPS = "Lat: %.4f, Lng: %.4f".format(latActual, lngActual)
-                }
-            } catch (e: SecurityException) { }
+            iniciarGps()
         } else {
             permissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose { locationManager.removeUpdates(locationListener) }
+    }
+
+    // Estado según la última marcación guardada en el servidor
+    val ultima = jornadas
+        .filter { it.idEmpleado == miId }
+        .maxByOrNull { it.fechaHoraMarcacion ?: "" }
+    val enJornada = ultima?.tipoMarcacion == "ENTRADA"
+
+    val la = lat
+    val lo = lng
+    val tieneGps = la != null && lo != null
+
     Scaffold(
-        topBar = { Header(title = "CONTROL DE JORNADA", userName = userName) },
+        topBar = { Header(title = "CONTROL DE JORNADA", userName = usuario.nombreCompleto) },
         bottomBar = { Footer(onNavigateHome = onNavigateHome, onLogout = onLogout) }
     ) { innerPadding ->
         Column(
@@ -106,33 +122,27 @@ fun ControlJornadaScreen(userName: String, userId: String = "default_user", onNa
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Estado: $estadoJornada", color = IndustrialTextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (enJornada) "Estado: EN JORNADA (desde ${ultima?.fechaHoraMarcacion.fechaCorta()})" else "Estado: FUERA DE TURNO",
+                        color = IndustrialTextWhite,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Coordenadas GPS: $infoGPS", color = IndustrialYellowAccent, fontSize = 13.sp)
+                    Text(
+                        text = if (tieneGps) "GPS: Lat %.5f, Lng %.5f".format(la, lo) else "Buscando señal GPS...",
+                        color = IndustrialYellowAccent,
+                        fontSize = 13.sp
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = {
-                    val time = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date())
-                    estadoJornada = "EN JORNADA ($time)"
-                    coroutineScope.launch(Dispatchers.IO) {
-                        val db = AppDatabase.getDatabase(context)
-                        db.registroJornadaDao().registrarMarcacion(
-                            RegistroJornadaEntity(
-                                idEmpleado = userId,
-                                tipoMarcacion = "Entrada",
-                                fechaHoraMarcacion = time,
-                                latitudMarcacion = latActual,
-                                longitudMarcacion = lngActual
-                            )
-                        )
-                    }
-                    Toast.makeText(context, "Entrada guardada en Auditoría (GPS)", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                onClick = { if (la != null && lo != null) vm.marcarJornada(miId, "ENTRADA", la, lo) },
+                enabled = tieneGps && !enJornada,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(containerColor = IndustrialYellowAccent, contentColor = IndustrialBlack)
             ) {
@@ -142,24 +152,9 @@ fun ControlJornadaScreen(userName: String, userId: String = "default_user", onNa
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = {
-                    val time = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date())
-                    estadoJornada = "FINALIZADO ($time)"
-                    coroutineScope.launch(Dispatchers.IO) {
-                        val db = AppDatabase.getDatabase(context)
-                        db.registroJornadaDao().registrarMarcacion(
-                            RegistroJornadaEntity(
-                                idEmpleado = userId,
-                                tipoMarcacion = "Salida",
-                                fechaHoraMarcacion = time,
-                                latitudMarcacion = latActual,
-                                longitudMarcacion = lngActual
-                            )
-                        )
-                    }
-                    Toast.makeText(context, "Salida guardada en Auditoría (GPS)", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                onClick = { if (la != null && lo != null) vm.marcarJornada(miId, "SALIDA", la, lo) },
+                enabled = tieneGps && enJornada,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(containerColor = IndustrialErrorRed, contentColor = IndustrialTextWhite)
             ) {
