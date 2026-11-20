@@ -8,21 +8,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.electromechanics.app.data.local.entity.EmpleadoEntity
+import com.electromechanics.app.model.Empleado
 import com.electromechanics.app.ui.components.Footer
 import com.electromechanics.app.ui.components.Header
 import com.electromechanics.app.ui.theme.*
 
 @Composable
-fun PerfilEmpleadoScreen(user: EmpleadoEntity?, onNavigateHome: () -> Unit) {
+fun PerfilEmpleadoScreen(usuario: Empleado, onNavigateHome: () -> Unit) {
     Scaffold(
-        topBar = { Header(title = "MI PERFIL TÉCNICO", userName = user?.nombreCompleto ?: "Técnico") },
+        topBar = { Header(title = "MI PERFIL", userName = usuario.nombreCompleto) },
         bottomBar = { Footer(onNavigateHome = onNavigateHome, onLogout = null) }
     ) { innerPadding ->
         Column(
             modifier = Modifier.fillMaxSize().background(IndustrialBlack).padding(innerPadding).padding(20.dp)
         ) {
-            Text("Información del Operario", color = IndustrialYellowAccent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text("Información del Usuario", color = IndustrialYellowAccent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
 
             Card(
@@ -30,13 +30,15 @@ fun PerfilEmpleadoScreen(user: EmpleadoEntity?, onNavigateHome: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Nombre: ${user?.nombreCompleto ?: "Operario Terreno"}", color = IndustrialTextWhite, fontSize = 16.sp)
+                    Text("Nombre: ${usuario.nombreCompleto}", color = IndustrialTextWhite, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("RUT: ${user?.rut ?: "Sin registro"}", color = IndustrialTextWhite, fontSize = 14.sp)
+                    Text("RUT: ${usuario.rutTrabajador}", color = IndustrialTextWhite, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Correo: ${user?.correo ?: "contacto@electromechanics.cl"}", color = IndustrialTextWhite, fontSize = 14.sp)
+                    Text("Correo: ${usuario.correoCorporativo}", color = IndustrialTextWhite, fontSize = 14.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Especialidad: ${user?.especialidad ?: "Electromecánica General"}", color = IndustrialYellowAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Especialidad: ${usuario.especialidadTecnica ?: "No registrada"}", color = IndustrialTextWhite, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Rol: ${usuario.rol}", color = IndustrialYellowAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

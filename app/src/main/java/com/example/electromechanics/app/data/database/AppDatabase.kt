@@ -9,7 +9,7 @@ import com.electromechanics.app.data.local.dao.RegistroJornadaDao
 import com.electromechanics.app.data.local.entity.EmpleadoEntity
 import com.electromechanics.app.data.local.entity.RegistroJornadaEntity
 
-@Database(entities = [EmpleadoEntity::class, RegistroJornadaEntity::class], version = 1, exportSchema = false)
+@Database(entities = [EmpleadoEntity::class, RegistroJornadaEntity::class], version = 3, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun empleadoDao(): EmpleadoDao
     abstract fun registroJornadaDao(): RegistroJornadaDao
@@ -24,7 +24,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "electromechanics_db"
-                ).build()
+                ).fallbackToDestructiveMigration().build()
                 INSTANCE = instance
                 instance
             }
