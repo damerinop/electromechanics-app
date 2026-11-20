@@ -8,9 +8,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Assignment
-import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,18 +20,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.electromechanics.app.model.Empleado
 import com.electromechanics.app.ui.components.Footer
 import com.electromechanics.app.ui.components.Header
+import com.electromechanics.app.ui.navigation.Routes
 import com.electromechanics.app.ui.theme.*
 
 @Composable
 fun HomeScreen(
-    userName: String,
+    usuario: Empleado,
     onNavigate: (String) -> Unit,
     onLogout: () -> Unit
 ) {
     Scaffold(
-        topBar = { Header(title = "PANEL PRINCIPAL", userName = userName) },
+        topBar = { Header(title = "PANEL PRINCIPAL", userName = "${usuario.nombreCompleto} (${usuario.rol})") },
         bottomBar = { Footer(onNavigateHome = null, onLogout = onLogout) }
     ) { innerPadding ->
         Column(
@@ -43,20 +45,21 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Módulos de Terreno",
-                color = IndustrialYellowAccent,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            MenuCard("Control de Jornada", "Marcación de entrada y salida con GPS", Icons.Default.AccessTime) { onNavigate("CONTROL_JORNADA") }
-            MenuCard("Hoja de Ruta / Órdenes", "Trabajos asignados y gestión técnica", Icons.Default.Assignment) { onNavigate("AGENDA_SERVICIOS") }
-            MenuCard("Historial de Jornadas", "Auditoría de asistencia y geolocalización", Icons.Default.History) { onNavigate("HISTORIAL_JORNADAS") }
-            MenuCard("Sucursales de Clientes", "Repositorio y mapas de instalaciones", Icons.Default.Business) { onNavigate("SUCURSALES_MAPA") }
-            MenuCard("Notificaciones Operativas", "Avisos de urgencia y despachos", Icons.Default.Notifications) { onNavigate("NOTIFICACIONES") }
-            MenuCard("Mi Perfil Técnico", "Datos personales, especialidad y rol", Icons.Default.Person) { onNavigate("PERFIL_EMPLEADO") }
+            if (usuario.esSupervisor) {
+                Text("Panel del Supervisor", color = IndustrialYellowAccent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                MenuCard("Gestión de Técnicos", "Crear y listar técnicos", Icons.Default.Group) { onNavigate(Routes.TECNICOS) }
+                MenuCard("Órdenes de Trabajo", "Crear, asignar y revisar estados", Icons.Default.Assignment) { onNavigate(Routes.ORDENES_SUP) }
+                MenuCard("Bitácora de Actividades", "Reportes y evidencias de los técnicos", Icons.Default.Build) { onNavigate(Routes.ACTIVIDADES) }
+                MenuCard("Auditoría de Jornadas", "Asistencia y GPS de todos los técnicos", Icons.Default.History) { onNavigate(Routes.HISTORIAL_JORNADAS) }
+            } else {
+                Text("Módulos de Terreno", color = IndustrialYellowAccent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                MenuCard("Control de Jornada", "Marcación de entrada y salida con GPS", Icons.Default.AccessTime) { onNavigate(Routes.CONTROL_JORNADA) }
+                MenuCard("Mis Órdenes", "Hoja de ruta, estados y evidencia", Icons.Default.Assignment) { onNavigate(Routes.MIS_ORDENES) }
+                MenuCard("Mis Jornadas", "Historial de mis marcaciones", Icons.Default.History) { onNavigate(Routes.HISTORIAL_JORNADAS) }
+            }
+            MenuCard("Mi Perfil", "Datos personales y rol", Icons.Default.Person) { onNavigate(Routes.PERFIL) }
         }
     }
 }

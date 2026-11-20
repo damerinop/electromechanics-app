@@ -9,14 +9,15 @@ import com.electromechanics.app.data.local.entity.EmpleadoEntity
 @Dao
 interface EmpleadoDao {
 
-    @Query("SELECT * FROM empleados WHERE rut = :rut AND clave = :clave LIMIT 1")
-    suspend fun autenticar(rut: String, clave: String): EmpleadoEntity?
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun guardar(empleado: EmpleadoEntity)
 
-    // Consulta para comprobar si ya existe un usuario registrado con este RUT
-    @Query("SELECT * FROM empleados WHERE id = :rut LIMIT 1")
-    suspend fun obtenerPorRut(rut: String): EmpleadoEntity?
+    @Query("SELECT * FROM empleados WHERE sesionActiva = 1 LIMIT 1")
+    suspend fun obtenerSesion(): EmpleadoEntity?
 
-    // Usamos OnConflictStrategy.ABORT para evitar que se sobrescriba el usuario existente
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun registrarEmpleado(empleado: EmpleadoEntity)
+    @Query("SELECT * FROM empleados")
+    suspend fun obtenerTodos(): List<EmpleadoEntity>
+
+    @Query("UPDATE empleados SET sesionActiva = 0")
+    suspend fun cerrarSesiones()
 }

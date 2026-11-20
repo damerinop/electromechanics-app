@@ -2,7 +2,6 @@ package com.electromechanics.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Colores institucionales de Electromechanics
 val IndustrialBluePrimary = Color(0xFF0D47A1)
 val IndustrialYellowAccent = Color(0xFFFFD700)
 val IndustrialBlack = Color(0xFF181818)     // Gris oscuro elegante

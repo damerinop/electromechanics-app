@@ -1,0 +1,57 @@
+flowchart TB
+    NAV["AppNavigation<br/>NavHost + ConRol<br/>bloquea las rutas del otro rol"]
+
+    subgraph VIEW["VISTA - Jetpack Compose"]
+        direction LR
+        subgraph COMUN["Ambos roles"]
+            direction TB
+            LOGIN["LoginScreen<br/>iniciar sesión"]
+            HOME["HomeScreen<br/>menú según rol<br/>cerrar sesión"]
+            PERFIL["PerfilEmpleadoScreen"]
+            HIST["HistorialJornadasScreen<br/>técnico: propias<br/>supervisor: todas"]
+            COMP["Header · Footer · Utilidades"]
+        end
+        subgraph TEC["Rol TÉCNICO"]
+            direction TB
+            CJ["ControlJornadaScreen<br/>marca entrada y salida"]
+            MO["MisOrdenesScreen<br/>estado, comentario y foto"]
+            GPS["GPS<br/>LocationManager"]
+            CAM["Cámara<br/>TakePicture + FileProvider"]
+            CJ --> GPS
+            MO --> CAM
+        end
+        subgraph SUP["Rol SUPERVISOR"]
+            direction TB
+            TS["TecnicosScreen<br/>crea técnicos"]
+            OS["OrdenesSupervisorScreen<br/>crea y asigna órdenes"]
+            AS["ActividadesScreen<br/>bitácora y evidencia"]
+        end
+    end
+
+    subgraph VM["VIEWMODEL - LiveData + viewModelScope"]
+        direction LR
+        AVM["AuthViewModel<br/>login · logout · sesión"]
+        OVM["OperacionesViewModel<br/>empleados · órdenes<br/>actividades · jornadas"]
+    end
+
+    subgraph DATA["MODELO / DATOS"]
+        direction LR
+        subgraph LOCAL["Local - Room / SQLite"]
+            ROOM["AppDatabase · EmpleadoDao<br/>EmpleadoEntity<br/>usuario y clave con hash"]
+        end
+        subgraph REMOTE["Remoto - Retrofit"]
+            API["EmpleadoApi · OrdenTrabajoApi<br/>ActividadApi · JornadaApi<br/>RetrofitElectromechanics"]
+        end
+        MODEL["model<br/>Empleado · OrdenTrabajo<br/>RegistroActividad · Jornada"]
+    end
+
+    BACK["Microservicios Spring Boot en AWS<br/>PostgreSQL"]
+    UTIL["utils<br/>RutUtils módulo 11 · Seguridad SHA-256<br/>FotoUtils Base64 · Formato"]
+
+    NAV --> VIEW
+    VIEW -- "observa estado y envía eventos" --> VM
+    AVM --> ROOM
+    AVM --> API
+    OVM --> API
+    API -- "HTTP / JSON" --> BACK
+    VM -.-> UTIL
