@@ -1,0 +1,25 @@
+flowchart LR
+    subgraph CLIENTE["Dispositivo Android"]
+        APP["App Electromechanics<br/>Jetpack Compose + MVVM<br/>Retrofit + Room"]
+    end
+
+    GH["GitHub<br/>repositorio backend"]
+
+    subgraph AWS["AWS EC2 - Amazon Linux 2023 - IP elástica"]
+        SG{{"Grupo de seguridad<br/>TCP 8084 · 8086 · 8088"}}
+        subgraph DOCKER["Docker Compose - red interna"]
+            EMP["empleados-api<br/>puerto 8084<br/>Controller · Service · Repository<br/>/api/empleados"]
+            ACT["actividades-api<br/>puerto 8088<br/>Controller · Service · Repository<br/>/api/ordenes-trabajo<br/>/api/actividades"]
+            JOR["jornada-api<br/>puerto 8086<br/>Controller · Service · Repository<br/>/api/registrarjornadas"]
+            DB[("PostgreSQL 17<br/>electromechanicsdb<br/>tablas: empleado · orden_trabajo<br/>registro_actividad · jornada<br/>volumen postgres_data")]
+        end
+    end
+
+    APP -- "HTTP / JSON" --> SG
+    SG --> EMP
+    SG --> ACT
+    SG --> JOR
+    EMP -- "JPA / JDBC" --> DB
+    ACT -- "JPA / JDBC" --> DB
+    JOR -- "JPA / JDBC" --> DB
+    GH -. "despliegue: git clone y<br/>docker compose up --build" .-> AWS
